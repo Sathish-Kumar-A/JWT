@@ -1,14 +1,17 @@
 var express = require('express');
 var router = express.Router();
 const { hashing, hashCompare } = require("../lib/auth");
+const date = new Date();
+const {roleCheck}=require('../lib/middleWare');
 const { mongodb, db_url, mongoClient,getCollection } = require("../dbConfig");
 
 /* GET home page. */
-router.get('/',async function (req, res, next) {
-  const { collection, client } = await getCollection("users");
+router.get('/', roleCheck,async function (req, res, next) {
+  const { email } = req.body;
+  const { collection, client } = await getCollection("password");
   try {
-    let document = await collection.find().toArray();
-    res.send(document);
+      let document = await collection.find().toArray();
+      res.send(document);  
   }
   catch (err) {
     console.log(err)
@@ -30,7 +33,7 @@ router.post("/register", async (req, res) => {
       res.send("user already exists");
     }
     else {
-      await collection.insertOne({ email: email, password: hash });
+      await collection.insertOne({ email: email, password: hash,created_at:date,role:{free:true,premium:false} });
       res.send("User registered successfully");
     }
     
@@ -59,11 +62,30 @@ router.post('/login', async (req, res) => {
     else {
       res.send("User doesn't exist. sign up to join");
     }
-    
-    // res.send(hash);
   }
   catch (err) {
     res.send(err);
+  }
+})
+
+router.put("/updaterole", async (req, res) => {
+  const { collection, client } = await getCollection("password");
+  try {
+    let document = await collection.findOne({ email: req.body.email });
+    if (document) {
+      await collection.updateOne({ email: req.body.email }, { $set: { role: { premium: true, free: false } } });  
+      res.status(200).send("Roles updated");
+    }
+    else {
+      res.status(200).send("user doesn't exist");
+    }
+  }
+  catch (err) {
+    console.log(err);
+    res.status(500).send("Internal server error");
+  }
+  finally {
+    client.close();
   }
 })
 
