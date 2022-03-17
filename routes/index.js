@@ -1,6 +1,6 @@
 var express = require('express');
 var router = express.Router();
-const { hashing, hashCompare } = require("../lib/auth");
+const { hashing, hashCompare, createJWT, authentication } = require("../lib/auth");
 const date = new Date();
 const {roleCheck}=require('../lib/middleWare');
 const { mongodb, db_url, mongoClient,getCollection } = require("../dbConfig");
@@ -33,8 +33,12 @@ router.post("/register", async (req, res) => {
       res.send("user already exists");
     }
     else {
-      await collection.insertOne({ email: email, password: hash,created_at:date,role:{free:true,premium:false} });
-      res.send("User registered successfully");
+      const token = await createJWT({ email });
+      await collection.insertOne({ email: email, password: hash,created_at:date,role:{free:true,premium:false},verified:false });
+      res.send({
+        message: "User registered successfully",
+        token
+      });
     }
     
   }
@@ -49,11 +53,14 @@ router.post('/login', async (req, res) => {
   try {
     const { email,password } = req.body;
     let user = await collection.findOne({ email: email });
-    console.log(user)
     if (user) {
       const hash = await hashCompare(password, user.password);
       if (hash) {
-        res.send("Logging In");
+        const token = await createJWT({ email });
+        res.send({
+          message: "Logging In",
+          token
+        });
       }
       else {
         res.send("Incorrect email ID or password");
@@ -65,6 +72,30 @@ router.post('/login', async (req, res) => {
   }
   catch (err) {
     res.send(err);
+  }
+})
+
+router.post("/verify-token/:token", async (req, res) => {
+  const { collection, client } = await getCollection("password");
+  try {
+    console.log(req.params.token)
+    const {active,email} = authentication(req.params.token);
+    if (active) {
+      await collection.updateOne({ email }, { $set: { verified: true } });
+      res.status(200).send({
+        message:"User verified successfully"
+      })
+    }
+    else {
+      res.status(401).send({
+        message:"Token expired"
+      })
+    }
+  } catch (error) {
+    console.log(error);
+    res.send({
+      message:error
+    })
   }
 })
 

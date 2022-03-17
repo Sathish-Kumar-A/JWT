@@ -1,0 +1,7 @@
+register - create user and create jwt
+verify - verify the token to ensure whether the token is active and update in db
+
+
+login - create jwt token with login credentials and refresh token
+to get or do other HTTP methods use this jwt token and afetr it's expiry use refresh token to generate new JWT token and new refresh token.
+
